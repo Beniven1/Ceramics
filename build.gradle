@@ -1,50 +1,36 @@
 buildscript {
   repositories {
     maven { url = 'https://maven.minecraftforge.net' }
-    jcenter()
     mavenCentral()
-    maven {
-      name "Parchment"
-      url "https://maven.parchmentmc.org"
-    }
+    maven { url = 'https://maven.parchmentmc.org' }
   }
   dependencies {
     classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.+', changing: true
     classpath 'org.parchmentmc:librarian:1.+'
   }
 }
+
 apply plugin: 'net.minecraftforge.gradle'
 apply plugin: 'eclipse'
 apply plugin: 'maven-publish'
 apply plugin: 'org.parchmentmc.librarian.forgegradle'
 
-group = "knightminer"
-archivesBaseName = "Ceramics"
+version = "${minecraft_version}-${mod_version}"
+group = 'knightminer.ceramics'
+archivesBaseName = 'Ceramics'
+
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
-configurations {
-    deployerJars
-}
-
-version = "${minecraft_version}-${mod_version}"
-
-sourceSets {
-  main { resources {
-    srcDirs "$rootDir/src/generated/resources"
-    //But exclude the cache of the generated data from what gets built
-    exclude '.cache'
-  } }
-}
+println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
 
 minecraft {
   mappings channel: 'parchment', version: "${parchment_version}-${minecraft_version}"
-  accessTransformer project.file("src/main/resources/META-INF/accesstransformer.cfg")
+  accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+
   runs {
     client {
       workingDirectory project.file('run')
-      // Recommended logging data for a userdev environment
-      property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
-      // Recommended logging level for the console
+      property 'forge.logging.markers', 'REGISTRIES'
       property 'forge.logging.console.level', 'debug'
       mods {
         ceramics {
@@ -55,9 +41,7 @@ minecraft {
 
     server {
       workingDirectory project.file('run')
-      // Recommended logging data for a userdev environment
-      property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
-      // Recommended logging level for the console
+      property 'forge.logging.markers', 'REGISTRIES'
       property 'forge.logging.console.level', 'debug'
       mods {
         ceramics {
@@ -68,100 +52,65 @@ minecraft {
 
     data {
       workingDirectory project.file('run')
-      // Recommended logging data for a userdev environment
-      property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
-      // Recommended logging level for the console
+      property 'forge.logging.markers', 'REGISTRIES'
       property 'forge.logging.console.level', 'debug'
-      args '--mod', 'ceramics', '--all', '--output', file('src/generated/resources/')
+      args '--mod', 'ceramics', '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
       mods {
         ceramics {
-           source sourceSets.main
+          source sourceSets.main
         }
       }
     }
   }
 }
 
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
 repositories {
-  // JEI and Mantle
-  maven {
-    name 'DVS1 Maven FS'
-    url 'https://dvs1.progwml6.com/files/maven'
-  }
+  maven { url = 'https://maven.minecraftforge.net/' }
+  maven { url = 'https://dvs1.progwml6.com/files/maven/' }
+  maven { url = 'https://modmaven.k-4u.nl' }
 }
 
 dependencies {
   minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-  implementation  fg.deobf("slimeknights.mantle:Mantle:${minecraft_version}-${mantle_version}")
-    
-  // compile against the JEI API but do not include it at runtime
-  compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}:${jei_version}:api")
-  // at runtime, use the full JEI jar
-  runtimeOnly fg.deobf("mezz.jei:jei-${minecraft_version}:${jei_version}")
-}
 
-// process mods.toml to inject variables
-def modsTomlSpec = copySpec{
-  from(sourceSets.main.resources) {
-    include 'META-INF/mods.toml'
-    expand 'version': mod_version,
-            'loader_range': loader_range,
-            'minecraft_range': minecraft_range,
-            'forge_range': forge_range,
-            'mantle_range': mantle_range
-  }
-}
-// need to copy into each build directory, unfortunately does not seem easy to do this automatically
-def buildPaths = [
-        "$rootDir/out/production/resources", // IDEA
-        "$rootDir/bin", // Eclipse
-]
+  implementation fg.deobf("slimeknights.mantle:Mantle:${minecraft_version}-${mantle_version}")
 
-// task to add mods.toml to all relevant folders
-task replaceResources {
-  // copy for gradle
-  copy {
-    outputs.upToDateWhen { false }
-    with modsTomlSpec
-    into processResources.destinationDir
-  }
-  // copy for IDEs
-  buildPaths.each { path ->
-    if (new File(path).exists()) {
-      copy {
-        outputs.upToDateWhen { false }
-        with modsTomlSpec
-        into path
-      }
-    }
-  }
-}
-
-processResources {
-  exclude 'META-INF/mods.toml'
-  finalizedBy replaceResources
+  compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
+  compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
+  runtimeOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge:${jei_version}")
 }
 
 jar {
   manifest {
     attributes([
-      "Specification-Title": "Ceramics",
-      "Specification-Vendor": "KnightMiner",
-      "Specification-Version": "1", // We are version 1 of ourselves
-      "Implementation-Title": project.name,
-      "Implementation-Version": "${version}",
-      "Implementation-Vendor": "KnightMiner",
-      "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+            "Specification-Title": "Ceramics",
+            "Specification-Vendor": "KnightMiner",
+            "Specification-Version": "1",
+            "Implementation-Title": project.name,
+            "Implementation-Version": "${version}",
+            "Implementation-Vendor": "KnightMiner",
+            "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
     ])
   }
 }
 
-// because the normal output has been made to be obfuscated
-task sourcesJar(type: Jar) {
-    from sourceSets.main.allJava
-    classifier = 'sources'
+jar.finalizedBy('reobfJar')
+
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      artifact jar
+    }
+  }
+  repositories {
+    maven {
+      url "file://${project.projectDir}/mcmodsrepo"
+    }
+  }
 }
 
-artifacts {
-    archives sourcesJar
+tasks.withType(JavaCompile).configureEach {
+  options.encoding = 'UTF-8'
 }
